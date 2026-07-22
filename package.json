@@ -1,0 +1,42 @@
+{
+	"name": "@sourceking/tanstack-lingui",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"typings": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./client": {
+			"types": "./dist/client/index.d.ts",
+			"import": "./dist/client/index.js"
+		}
+	},
+	"scripts": {
+		"build": "bun run clean && NODE_ENV=production bun run build.ts",
+		"typecheck": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"npm:publish": "npm publish --access public",
+		"npm:dry-run": "npm publish --access public --dry-run"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"@types/react": "^19.1.2",
+		"@types/react-dom": "^19.1.2"
+	},
+	"peerDependencies": {
+		"typescript": "^5",
+		"react": ">=19",
+		"react-dom": ">=19",
+		"@lingui/core": ">=6",
+		"@lingui/react": ">=6",
+		"@tanstack/react-router": ">=1",
+		"@tanstack/react-start": ">=1"
+	}
+}
