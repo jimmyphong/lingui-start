@@ -84,7 +84,7 @@ import { i18n } from "./i18n/server";
 
 export default createServerEntry({
 	async fetch(request) {
-		const { redirect, setCookie } = i18n.handleI18nMiddleware(request);
+		const { redirect, setCookie } = i18n.i18nServerEntry(request);
 		if (redirect) return redirect;
 
 		const response = await handler.fetch(request);
