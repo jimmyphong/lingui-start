@@ -1,7 +1,11 @@
 import type { I18n } from "@lingui/core";
 import type { AnyRouter, FileRouteTypes, Link } from "@tanstack/react-router";
 import type { RequestMiddlewareAfterServer } from "@tanstack/react-start";
-import type { ComponentType, ReactNode } from "react";
+import type {
+	ForwardRefExoticComponent,
+	ReactNode,
+	RefAttributes,
+} from "react";
 import type { JSX } from "react/jsx-runtime";
 
 export interface LocaleDefinition {
@@ -92,7 +96,9 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	) => TRouter;
 	stripLocalePrefix: (pathname: string) => string;
 	localizePath: (to: string) => string;
-	LocalizedLink: ComponentType<LocalizedLinkProps<LocalizedTo>>;
+	LocalizedLink: ForwardRefExoticComponent<
+		LocalizedLinkProps<LocalizedTo> & RefAttributes<HTMLAnchorElement>
+	>;
 	useLocale: () => {
 		currentLocale: LocaleCode<TConfig>;
 		switchLocale: (locale: LocaleCode<TConfig>) => Promise<void>;

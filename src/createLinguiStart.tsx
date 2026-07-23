@@ -4,7 +4,7 @@ import { I18nProvider, useLingui } from "@lingui/react";
 import type { AnyRouter } from "@tanstack/react-router";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { createMiddleware } from "@tanstack/react-start";
-import { useCallback } from "react";
+import { forwardRef, useCallback } from "react";
 import type {
 	CreateLinguiStartResult,
 	LinguiStartConfig,
@@ -232,12 +232,12 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 	};
 
 	// Client: LocalizedLink component
-	const LocalizedLink = <TTo extends LocalizedTo>({
-		to,
-		...props
-	}: LocalizedLinkProps<TTo>) => {
-		return <Link to={localizePath(to)} {...props} />;
-	};
+	const LocalizedLink = forwardRef<
+		HTMLAnchorElement,
+		LocalizedLinkProps<LocalizedTo>
+	>(({ to, ...props }, ref) => {
+		return <Link ref={ref} to={localizePath(to)} {...props} />;
+	});
 
 	// Client: useLocale hook
 	const useLocale = () => {
