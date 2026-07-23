@@ -9,6 +9,8 @@ import type {
 	CreateLinguiStartResult,
 	LinguiStartConfig,
 	LocaleCode,
+	LocalizedLinkProps,
+	LocalizedTo,
 } from "./types";
 
 export function createLinguiStart<TConfig extends LinguiStartConfig>(
@@ -230,10 +232,10 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 	};
 
 	// Client: LocalizedLink component
-	const LocalizedLink = ({
+	const LocalizedLink = <TTo extends LocalizedTo>({
 		to,
 		...props
-	}: React.ComponentProps<typeof Link> & { to: string }) => {
+	}: LocalizedLinkProps<TTo>) => {
 		return <Link to={localizePath(to)} {...props} />;
 	};
 

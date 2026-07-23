@@ -1,7 +1,7 @@
 import type { I18n } from "@lingui/core";
-import type { AnyRouter, Link } from "@tanstack/react-router";
+import type { AnyRouter, FileRouteTypes, Link } from "@tanstack/react-router";
 import type { RequestMiddlewareAfterServer } from "@tanstack/react-start";
-import type { ComponentProps, ComponentType, ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { JSX } from "react/jsx-runtime";
 
 export interface LocaleDefinition {
@@ -22,11 +22,26 @@ export interface LinguiStartConfig<
 	loadMessages: (locale: string) => Promise<Record<string, string>>;
 }
 
+export type StripLocalePrefix<T extends string> = T extends "/{-$locale}"
+	? "/"
+	: T extends `/{-$locale}${infer Rest}`
+		? Rest
+		: never;
+
+export type LocalizedFullPaths = Extract<
+	FileRouteTypes["to"],
+	`/{-$locale}${string}`
+>;
+
+export type LocalizedTo = StripLocalePrefix<LocalizedFullPaths>;
+
 export type LocaleCode<TConfig extends LinguiStartConfig> =
 	TConfig["locales"][number]["code"];
 
-export type LocalizedLinkProps = Omit<ComponentProps<typeof Link>, "to"> & {
-	to: string;
+export type LocalizedLinkProps<TTo extends LocalizedTo> = React.ComponentProps<
+	typeof Link
+> & {
+	to: TTo;
 };
 
 export interface DehydratedI18n {
@@ -77,7 +92,7 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	) => TRouter;
 	stripLocalePrefix: (pathname: string) => string;
 	localizePath: (to: string) => string;
-	LocalizedLink: ComponentType<LocalizedLinkProps>;
+	LocalizedLink: ComponentType<LocalizedLinkProps<LocalizedTo>>;
 	useLocale: () => {
 		currentLocale: LocaleCode<TConfig>;
 		switchLocale: (locale: LocaleCode<TConfig>) => Promise<void>;
