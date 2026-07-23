@@ -1,7 +1,7 @@
 import type { I18n } from "@lingui/core";
-import type { AnyRouter } from "@tanstack/react-router";
+import type { AnyRouter, Link } from "@tanstack/react-router";
 import type { RequestMiddlewareAfterServer } from "@tanstack/react-start";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentProps, ComponentType, ReactNode } from "react";
 import type { JSX } from "react/jsx-runtime";
 
 export interface LocaleDefinition {
@@ -25,6 +25,10 @@ export interface LinguiStartConfig<
 export type LocaleCode<TConfig extends LinguiStartConfig> =
 	TConfig["locales"][number]["code"];
 
+export type LocalizedLinkProps = Omit<ComponentProps<typeof Link>, "to"> & {
+	to: string;
+};
+
 export interface DehydratedI18n {
 	locale: string;
 	messages: Record<string, string>;
@@ -45,7 +49,7 @@ export interface LocaleMiddlewareResult {
 	setCookie?: { name: string; value: string };
 }
 
-export interface LocaleUtilsResult<TConfig extends LinguiStartConfig> {
+export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	config: TConfig;
 	isValidLocale: (locale: string | undefined) => locale is LocaleCode<TConfig>;
 	shouldIgnorePath: (pathname: string) => boolean;
@@ -55,12 +59,6 @@ export interface LocaleUtilsResult<TConfig extends LinguiStartConfig> {
 	) => LocaleCode<TConfig> | null;
 	createCookieHeader: (value: LocaleCode<TConfig>) => string;
 	getLocaleFromRequest: (request: Request) => LocaleFromRequestResult;
-	stripLocalePrefix: (pathname: string) => string;
-	localizePath: (to: string) => string;
-}
-
-export interface ServerLinguiResult<TConfig extends LinguiStartConfig>
-	extends LocaleUtilsResult<TConfig> {
 	i18nServerEntry: (request: Request) => LocaleMiddlewareResult;
 	i18nMiddleware: RequestMiddlewareAfterServer<
 		Record<never, never>,
@@ -77,11 +75,9 @@ export interface ServerLinguiResult<TConfig extends LinguiStartConfig>
 			WrapProvider?: (props: { children: ReactNode }) => JSX.Element;
 		},
 	) => TRouter;
-}
-
-export interface ClientLinguiResult<TConfig extends LinguiStartConfig>
-	extends LocaleUtilsResult<TConfig> {
-	LocalizedLink: ComponentType<{ to: string; children?: ReactNode }>;
+	stripLocalePrefix: (pathname: string) => string;
+	localizePath: (to: string) => string;
+	LocalizedLink: ComponentType<LocalizedLinkProps>;
 	useLocale: () => {
 		currentLocale: LocaleCode<TConfig>;
 		switchLocale: (locale: LocaleCode<TConfig>) => Promise<void>;

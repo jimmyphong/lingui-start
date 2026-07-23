@@ -1,2 +1,2 @@
-export { createServerLingui } from "./server";
+export { createLinguiStart } from "./createLinguiStart";
 export * from "./types";

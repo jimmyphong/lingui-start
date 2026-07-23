@@ -1,6 +1,6 @@
 {
 	"name": "@sourceking/tanstack-lingui",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -12,10 +12,6 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
-		},
-		"./client": {
-			"types": "./dist/client/index.d.ts",
-			"import": "./dist/client/index.js"
 		}
 	},
 	"scripts": {

@@ -2,7 +2,7 @@ import { build } from "bun";
 
 const main = async () => {
 	await build({
-		entrypoints: ["./src/index.ts", "./src/client/index.ts"],
+		entrypoints: ["./src/index.ts"],
 		outdir: "./dist",
 		target: "browser",
 		format: "esm",
@@ -20,7 +20,14 @@ const main = async () => {
 	});
 
 	const proc = Bun.spawn(
-		["bunx", "tsc", "--emitDeclarationOnly", "--declaration", "--outDir", "dist"],
+		[
+			"bunx",
+			"tsc",
+			"--emitDeclarationOnly",
+			"--declaration",
+			"--outDir",
+			"dist",
+		],
 		{
 			cwd: process.cwd(),
 			stdio: ["inherit", "inherit", "inherit"],
