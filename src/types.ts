@@ -101,7 +101,10 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	>;
 	useLocale: () => {
 		currentLocale: LocaleCode<TConfig>;
-		switchLocale: (locale: LocaleCode<TConfig>) => Promise<void>;
+		switchLocale: (
+			locale: LocaleCode<TConfig>,
+			redirectUrl?: string,
+		) => Promise<void>;
 	};
 	useLocalizedNavigate: () => (to: string) => void;
 }
