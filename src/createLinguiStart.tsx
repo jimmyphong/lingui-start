@@ -247,7 +247,7 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 			config.defaultLocale) as LocaleCode<TConfig>;
 
 		const switchLocale = useCallback(
-			async (newLocale: LocaleCode<TConfig>) => {
+			async (newLocale: LocaleCode<TConfig>, redirectUrl?: string) => {
 				if (newLocale === currentLocale || !isValidLocale(newLocale)) return;
 
 				// biome-ignore lint/suspicious/noDocumentCookie: <We are intentionally setting a cookie here to persist the locale change>
@@ -256,7 +256,9 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 				i18n.loadAndActivate({ locale: newLocale, messages });
 				document.documentElement.lang = newLocale;
 
-				const basePath = stripLocalePrefix(window.location.pathname);
+				const basePath = stripLocalePrefix(
+					redirectUrl || window.location.pathname,
+				);
 				const newPath =
 					newLocale === config.defaultLocale
 						? basePath
