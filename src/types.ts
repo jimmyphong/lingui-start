@@ -36,14 +36,21 @@ export type LocalizedFullPaths = Extract<
 
 export type LocalizedTo = StripLocalePrefix<LocalizedFullPaths>;
 
+export type LocalizedDestination<TTo extends LocalizedTo> = TTo extends "/"
+	? "/{-$locale}"
+	: `/{-$locale}${TTo}`;
+
 export type LocaleCode<TConfig extends LinguiStartConfig> =
 	TConfig["locales"][number]["code"];
 
-export type LocalizedLinkProps<
-	TRouter extends AnyRouter = AnyRouter,
-	TFrom extends string = string,
-	TTo extends string = string,
-> = React.ComponentProps<typeof Link<TRouter, TFrom, TTo>>;
+export type LocalizedLinkProps<TTo extends LocalizedTo = LocalizedTo> = {
+	to: TTo;
+} & Omit<
+	React.ComponentProps<
+		typeof Link<AnyRouter, string, LocalizedDestination<TTo>>
+	>,
+	"to"
+>;
 
 export interface DehydratedI18n {
 	locale: string;
@@ -93,12 +100,8 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	) => TRouter;
 	stripLocalePrefix: (pathname: string) => string;
 	localizePath: (to: string) => string;
-	LocalizedLink: <
-		TRouter extends AnyRouter = AnyRouter,
-		TFrom extends string = string,
-		TTo extends string = string,
-	>(
-		props: LocalizedLinkProps<TRouter, TFrom, TTo> & {
+	LocalizedLink: <TTo extends LocalizedTo>(
+		props: LocalizedLinkProps<TTo> & {
 			ref?: React.Ref<HTMLAnchorElement>;
 		},
 	) => React.JSX.Element;

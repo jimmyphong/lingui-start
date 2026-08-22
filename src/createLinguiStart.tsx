@@ -9,7 +9,9 @@ import type {
 	CreateLinguiStartResult,
 	LinguiStartConfig,
 	LocaleCode,
+	LocalizedDestination,
 	LocalizedLinkProps,
+	LocalizedTo,
 } from "./types";
 
 export function createLinguiStart<TConfig extends LinguiStartConfig>(
@@ -230,25 +232,17 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 		return to === "/" ? "/{-$locale}" : `/{-$locale}${to}`;
 	};
 
-	// Client: LocalizedLink component
-	const LocalizedLink = <
-		TRouter extends AnyRouter = AnyRouter,
-		TFrom extends string = string,
-		TTo extends string = string,
-	>(
-		props: LocalizedLinkProps<TRouter, TFrom, TTo> & {
+	// Client: LocalizedLink component (compile-time path transform)
+	const LocalizedLink = <TTo extends LocalizedTo>(
+		props: LocalizedLinkProps<TTo> & {
 			ref?: React.Ref<HTMLAnchorElement>;
 		},
 	) => {
 		const { to, ref, ...rest } = props;
-		const localizedTo = to ? localizePath(String(to)) : undefined;
-
-		const linkProps = {
-			...rest,
-			ref,
-			to: localizedTo,
-		} as unknown as Parameters<typeof Link>[0];
-		return <Link {...linkProps} />;
+		const localizedTo = (
+			to === "/" ? "/{-$locale}" : `/{-$locale}${to}`
+		) as LocalizedDestination<TTo>;
+		return <Link {...rest} ref={ref} to={localizedTo} />;
 	};
 
 	// Client: useLocale hook
