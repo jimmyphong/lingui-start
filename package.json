@@ -1,6 +1,6 @@
 {
 	"name": "@sourceking/tanstack-lingui",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -23,16 +23,16 @@
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"@types/react": "^19.1.2",
-		"@types/react-dom": "^19.1.2"
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.4"
 	},
 	"peerDependencies": {
-		"typescript": "^5",
-		"react": ">=19",
-		"react-dom": ">=19",
-		"@lingui/core": ">=6",
-		"@lingui/react": ">=6",
-		"@tanstack/react-router": ">=1",
-		"@tanstack/react-start": ">=1"
+		"typescript": "^5.9.3",
+		"react": "^19.2.8",
+		"react-dom": "^19.2.8",
+		"@lingui/core": "^6.5.0",
+		"@lingui/react": "^6.5.0",
+		"@tanstack/react-router": "^1.170.18",
+		"@tanstack/react-start": "^1.168.32"
 	}
 }
