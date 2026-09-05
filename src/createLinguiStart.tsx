@@ -74,10 +74,7 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 			};
 		}
 
-		const locale =
-			extractLocaleFromPath(url.pathname) ??
-			cookieLocale ??
-			config.defaultLocale;
+		const locale = extractLocaleFromPath(url.pathname) ?? config.defaultLocale;
 		const shouldSetCookie = cookieLocale !== locale;
 
 		return {
