@@ -1,9 +1,9 @@
 import type { I18n } from "@lingui/core";
-import { setupI18n } from "@lingui/core";
+import { setupI18n as createI18n } from "@lingui/core";
 import { I18nProvider, useLingui } from "@lingui/react";
 import type { AnyRouter } from "@tanstack/react-router";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { createMiddleware } from "@tanstack/react-start";
+import { createMiddleware, getGlobalStartContext } from "@tanstack/react-start";
 import { useCallback } from "react";
 import type {
 	CreateLinguiStartResult,
@@ -89,6 +89,18 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 				: undefined,
 		};
 	};
+	
+	// Server: setup i18n instance
+	const setupI18n = () => {
+		let i18n = createI18n();
+		try {
+			const context = getGlobalStartContext() as
+				| { i18n?: ReturnType<typeof createI18n> }
+				| undefined;
+			i18n = context?.i18n ?? i18n;
+		} catch {}
+		return i18n;
+	};
 
 	// Server: TanStack Start server entry for i18n
 	const i18nServerEntry = (request: Request) => {
@@ -128,7 +140,7 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 		async ({ request, next }) => {
 			const { locale, headers } = getLocaleFromRequest(request);
 
-			const i18n = setupI18n();
+			const i18n = createI18n();
 			const messages = await config.loadMessages(locale);
 			i18n.loadAndActivate({ locale, messages });
 
@@ -295,6 +307,7 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 		parseLocaleCookie,
 		createCookieHeader,
 		getLocaleFromRequest,
+		setupI18n,
 		i18nServerEntry,
 		i18nMiddleware,
 		routerWithI18n,

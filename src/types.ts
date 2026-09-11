@@ -82,6 +82,7 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 	) => LocaleCode<TConfig> | null;
 	createCookieHeader: (value: LocaleCode<TConfig>) => string;
 	getLocaleFromRequest: (request: Request) => LocaleFromRequestResult;
+	setupI18n: () => I18n;
 	i18nServerEntry: (request: Request) => LocaleMiddlewareResult;
 	i18nMiddleware: RequestMiddlewareAfterServer<
 		Record<never, never>,
