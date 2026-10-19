@@ -21,6 +21,19 @@ export interface LinguiStartConfig<
 	cookieMaxAge?: number;
 	ignoredPaths?: string[];
 	loadMessages: (locale: string) => Promise<Record<string, string>>;
+	/**
+	 * Re-run every route loader after a switch (`router.invalidate()`).
+	 * Default true; false when no loader returns locale-dependent data,
+	 * so a switch waits for no server round trip.
+	 */
+	invalidateOnSwitch?: boolean;
+}
+
+export interface SwitchLocaleOptions {
+	/** The path to land on (default: the current one), without its locale prefix. */
+	redirectUrl?: string;
+	/** Overrides `invalidateOnSwitch` for this switch. */
+	invalidate?: boolean;
 }
 
 export type StripLocalePrefix<T extends string> = T extends "/{-$locale}"
@@ -106,12 +119,15 @@ export interface CreateLinguiStartResult<TConfig extends LinguiStartConfig> {
 			ref?: React.Ref<HTMLAnchorElement>;
 		},
 	) => React.JSX.Element;
+	/** Starts loading a locale's messages ahead of a switch; never rejects. */
+	preloadLocale: (locale: string) => void;
 	useLocale: () => {
 		currentLocale: LocaleCode<TConfig>;
 		switchLocale: (
 			locale: LocaleCode<TConfig>,
-			redirectUrl?: string,
+			redirect?: string | SwitchLocaleOptions,
 		) => Promise<void>;
+		preloadLocale: (locale: string) => void;
 	};
 	useLocalizedNavigate: () => (to: string) => void;
 }

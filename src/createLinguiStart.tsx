@@ -5,6 +5,7 @@ import type { AnyRouter } from "@tanstack/react-router";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { createMiddleware, getGlobalStartContext } from "@tanstack/react-start";
 import { useCallback } from "react";
+import { createMessageCache } from "./messageCache";
 import type {
 	CreateLinguiStartResult,
 	LinguiStartConfig,
@@ -12,12 +13,15 @@ import type {
 	LocalizedDestination,
 	LocalizedLinkProps,
 	LocalizedTo,
+	SwitchLocaleOptions,
 } from "./types";
 
 export function createLinguiStart<TConfig extends LinguiStartConfig>(
 	config: TConfig,
 ): CreateLinguiStartResult<TConfig> {
 	const localeSet = new Set(config.locales.map((l) => l.code));
+	// Client: each locale's messages loaded once (preloads and switches share it).
+	const messageCache = createMessageCache(config.loadMessages);
 	const ignoredPathsRegex = config.ignoredPaths
 		? new RegExp(`^/(?:${config.ignoredPaths.join("|")})(?:/|$)`)
 		: /^(?!)/; // never match
@@ -215,6 +219,11 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 				};
 				if (!state.dehydratedI18n) return;
 
+				// Switching back to the page's own locale needs no load.
+				messageCache.seed(
+					state.dehydratedI18n.locale,
+					state.dehydratedI18n.messages,
+				);
 				i18n.loadAndActivate({
 					locale: state.dehydratedI18n.locale,
 					messages: state.dehydratedI18n.messages,
@@ -254,6 +263,12 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 		return <Link {...rest} ref={ref} to={localizedTo} />;
 	};
 
+	// Client: start loading a locale's messages ahead of a switch (on hover,
+	// focus or a menu opening), so the switch itself waits for nothing.
+	const preloadLocale = (locale: string): void => {
+		if (isValidLocale(locale)) messageCache.preload(locale);
+	};
+
 	// Client: useLocale hook
 	const useLocale = () => {
 		const router = useRouter();
@@ -262,12 +277,20 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 			config.defaultLocale) as LocaleCode<TConfig>;
 
 		const switchLocale = useCallback(
-			async (newLocale: LocaleCode<TConfig>, redirectUrl?: string) => {
+			async (
+				newLocale: LocaleCode<TConfig>,
+				redirect?: string | SwitchLocaleOptions,
+			) => {
 				if (newLocale === currentLocale || !isValidLocale(newLocale)) return;
+				const options =
+					typeof redirect === "string" ? { redirectUrl: redirect } : redirect;
+				const redirectUrl = options?.redirectUrl;
+				const invalidate =
+					options?.invalidate ?? config.invalidateOnSwitch ?? true;
 
 				// biome-ignore lint/suspicious/noDocumentCookie: <We are intentionally setting a cookie here to persist the locale change>
 				document.cookie = createCookieHeader(newLocale);
-				const messages = await config.loadMessages(newLocale);
+				const messages = await messageCache.load(newLocale);
 				i18n.loadAndActivate({ locale: newLocale, messages });
 				document.documentElement.lang = newLocale;
 
@@ -280,12 +303,12 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 						: `/${newLocale}${basePath === "/" ? "" : basePath}`;
 
 				await router.navigate({ to: newPath, replace: true });
-				await router.invalidate();
+				if (invalidate) await router.invalidate();
 			},
 			[currentLocale, i18n, router],
 		);
 
-		return { currentLocale, switchLocale };
+		return { currentLocale, switchLocale, preloadLocale };
 	};
 
 	// Client: useLocalizedNavigate hook
@@ -314,6 +337,7 @@ export function createLinguiStart<TConfig extends LinguiStartConfig>(
 		stripLocalePrefix,
 		localizePath,
 		LocalizedLink,
+		preloadLocale,
 		useLocale,
 		useLocalizedNavigate,
 	};
