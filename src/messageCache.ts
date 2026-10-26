@@ -7,13 +7,9 @@ export type Messages = Record<string, string>;
  * tries again.
  */
 export interface MessageCache {
-	/** The locale's messages, loaded once. */
 	load(locale: string): Promise<Messages>;
-	/** Starts loading the locale's messages; never rejects. */
 	preload(locale: string): void;
-	/** Records messages already in hand (the hydrated locale). */
 	seed(locale: string, messages: Messages): void;
-	/** Whether the locale's messages are loaded or loading. */
 	has(locale: string): boolean;
 }
 

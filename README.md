@@ -1,34 +1,48 @@
-# @sourceking/tanstack-lingui
+# @jimmyphong/lingui-start
 
-TanStack Start + [Lingui](https://lingui.dev) i18n integration. Single factory — SSR middleware, router hydration, client hooks, path utilities. Works in both server and client bundles.
+[TanStack Start](https://tanstack.com/start) + [Lingui](https://lingui.dev) i18n integration. One factory, `createLinguiStart`, gives you the server entry handler, request middleware, router SSR hydration, locale-aware links and hooks, and path utilities. The same instance works in both the server and client bundles.
 
 ## Install
 
 ```bash
-bun add @sourceking/tanstack-lingui
+npm install @jimmyphong/lingui-start
+# or
+bun add @jimmyphong/lingui-start
+```
+
+Peer dependencies (install them in your app if they aren't there yet):
+
+```bash
+npm install react react-dom @lingui/core @lingui/react @tanstack/react-router @tanstack/react-start
 ```
 
 ## Quick start
 
-### 1. Config
+### 1. Locales
 
 ```ts
 // src/i18n/config.ts
-import type { LocaleDefinition } from "@sourceking/tanstack-lingui";
+import type { LocaleDefinition } from "@jimmyphong/lingui-start";
 
 export const locales = [
   { code: "en", name: "English", nativeName: "English" },
-  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt" },
+  { code: "es", name: "Spanish", nativeName: "Español" },
+  { code: "fr", name: "French", nativeName: "Français" },
+  { code: "de", name: "German", nativeName: "Deutsch" },
 ] as const satisfies readonly LocaleDefinition[];
 
 export type Locale = (typeof locales)[number]["code"];
 ```
 
-### 2. Create instance
+Use `as const` so `LocaleCode` gives you a union like `"en" | "es" | "fr" | "de"` and not just `string`.
+
+> Locale codes in URLs are matched as **two lowercase letters** (`/fr/...`). Codes like `pt-BR` won't be picked up from the path.
+
+### 2. Create the instance
 
 ```ts
 // src/i18n/i18n.ts
-import { createLinguiStart } from "@sourceking/tanstack-lingui";
+import { createLinguiStart } from "@jimmyphong/lingui-start";
 import { locales } from "./config";
 
 export const i18n = createLinguiStart({
@@ -38,11 +52,13 @@ export const i18n = createLinguiStart({
   cookieMaxAge: 31536000,
   ignoredPaths: ["api", "rpc", "webhook"],
   loadMessages: async (locale) => {
-    const { messages } = await import(`../locales/${locale}.json?lingui`);
+    const { messages } = await import(`../locales/${locale}.po`);
     return messages;
   },
 });
 ```
+
+The `.po` import needs [`@lingui/vite-plugin`](https://lingui.dev/ref/vite-plugin) (see [Lingui setup](#lingui-setup)). You can also import compiled catalogs instead.
 
 ### 3. Server entry (redirects + cookie sync)
 
@@ -70,48 +86,44 @@ export default createServerEntry({
 });
 ```
 
-`i18nServerEntry` handles:
-- `/en/about` → `/about` (strip default locale)
-- `/vi/api/hello` → `/api/hello` (strip locale from ignored paths)
-- `Set-Cookie` when URL locale ≠ cookie locale
+`i18nServerEntry(request)` returns `{ redirect?, setCookie? }`:
+
+- `/en/about` → 301 to `/about` (the default locale is never prefixed)
+- `/fr/api/hello` → 301 to `/api/hello` (ignored paths never carry a locale)
+- `/fr/about` with a missing or different locale cookie → `setCookie: { name, value: "fr" }`
+- Paths matching `ignoredPaths` → `{}` (nothing to do)
 
 ### 4. Request middleware
 
 ```ts
 // src/start.ts
-import { createCsrfMiddleware, createStart } from "@tanstack/react-start";
+import { createStart } from "@tanstack/react-start";
 import { i18n } from "./i18n/i18n";
 
-const csrfMiddleware = createCsrfMiddleware({
-  filter: (ctx) => ctx.handlerType === "serverFn",
-});
-
 export const startInstance = createStart(() => ({
-  requestMiddleware: [csrfMiddleware, i18n.i18nMiddleware],
+  requestMiddleware: [i18n.i18nMiddleware],
 }));
 ```
 
-Middleware extracts locale from URL path or cookie, loads messages, activates i18n, and injects `locale` + `i18n` into request context.
+On every request the middleware works out the locale (see [Locale resolution](#locale-resolution)), creates a Lingui `I18n` instance, loads that locale's messages with `loadMessages`, activates it, and passes `{ locale, i18n }` into the request context. If the locale cookie doesn't match, it also adds a `Set-Cookie` header to the response.
 
-### 5. Router wrapper
+### 5. Router
 
 ```tsx
 // src/router.tsx
-import { setupI18n } from "@lingui/core";
-import { createRouter as createTanStackRouter } from "@tanstack/react-router";
-import { getGlobalStartContext } from "@tanstack/react-start";
+import { createRouter } from "@tanstack/react-router";
 import { i18n } from "./i18n/i18n";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
-  const context = getGlobalStartContext();
-  const i18nInstance = context?.i18n ?? setupI18n();
+  // Server: the instance the middleware put in the request context.
+  // Client: a fresh instance, filled during hydration.
+  const i18nInstance = i18n.setupI18n();
 
-  const router = createTanStackRouter({
+  const router = createRouter({
     routeTree,
     scrollRestoration: true,
     defaultPreload: "intent",
-    defaultPreloadStaleTime: 0,
     context: { i18n: i18nInstance },
   });
 
@@ -125,17 +137,25 @@ declare module "@tanstack/react-router" {
 }
 ```
 
-`routerWithI18n` wraps the router with `<I18nProvider>`, handles SSR hydration/dehydration of locale + messages, and supports an optional `WrapProvider` for additional outer wrappers.
+`routerWithI18n(router, i18n, opts?)`:
 
-### 6. Route files
+- adds `i18n` to the router context
+- wraps the app in Lingui's `<I18nProvider>` and keeps any `Wrap` you already set
+- on the server, dehydrates the current locale and messages into the SSR payload
+- on the client, hydrates them, activates the locale, and caches the messages so switching back costs nothing
+- `opts.WrapProvider`, if given, is rendered **outside** `<I18nProvider>`
 
-Use the `{-$locale}` splat:
+### 6. Routes
+
+Put localized routes under the optional path param `{-$locale}`:
 
 ```
-src/routes/{-$locale}/
-  index.tsx
-  about.tsx
+src/routes/
   __root.tsx
+  {-$locale}/
+    index.tsx       → /, /fr
+    about.tsx       → /about, /fr/about
+  api/              → not localized (listed in ignoredPaths)
 ```
 
 ## Client API
@@ -144,23 +164,49 @@ src/routes/{-$locale}/
 
 ```tsx
 import { i18n } from "../i18n/i18n";
+import { locales, type Locale } from "../i18n/config";
 
 export function LangSwitcher() {
-  const { currentLocale, switchLocale } = i18n.useLocale();
+  const { currentLocale, switchLocale, preloadLocale } = i18n.useLocale();
 
   return (
     <select
       value={currentLocale}
-      onChange={(e) => switchLocale(e.target.value as typeof currentLocale)}
+      onFocus={() => locales.forEach((l) => preloadLocale(l.code))}
+      onChange={(e) => switchLocale(e.target.value as Locale)}
     >
-      <option value="en">English</option>
-      <option value="vi">Tiếng Việt</option>
+      {locales.map((l) => (
+        <option key={l.code} value={l.code}>
+          {l.nativeName}
+        </option>
+      ))}
     </select>
   );
 }
 ```
 
-`switchLocale` sets a cookie, loads messages, activates the new locale, updates `<html lang>`, and navigates to the locale-prefixed path.
+Returns `{ currentLocale, switchLocale, preloadLocale }`.
+
+`switchLocale(locale, redirect?)`:
+
+1. does nothing if `locale` is already active or isn't valid
+2. writes the locale cookie
+3. loads the messages (once per locale; a pending preload is reused) and activates them
+4. sets `<html lang>`
+5. navigates (with `replace`) to the same path under the new locale prefix, with no prefix for the default locale
+6. calls `router.invalidate()` to re-run loaders, unless that's turned off
+
+`redirect` can be a path string, or an options object:
+
+```ts
+switchLocale("fr", "/about");                              // land on /fr/about
+switchLocale("fr", { redirectUrl: "/about" });             // same
+switchLocale("fr", { invalidate: false });                 // skip router.invalidate() this time
+```
+
+### `preloadLocale(locale)`
+
+Starts loading a locale's messages ahead of time, e.g. on hover, on focus or when a menu opens, so the switch that follows doesn't have to wait. It never rejects. If a load fails, the next call tries again. It's available on the instance (`i18n.preloadLocale`) and from `useLocale()`.
 
 ### `LocalizedLink`
 
@@ -177,7 +223,7 @@ export function Nav() {
 }
 ```
 
-Auto-prefixes paths with the current locale. Renders a TanStack `<Link>`.
+A TanStack `<Link>` whose `to` is written **without** the locale segment. `"/about"` becomes `"/{-$locale}/about"`, so the current locale is kept. `to` is type-checked against the routes under `{-$locale}` in your route tree. All other `Link` props, including `ref`, are passed through.
 
 ### `useLocalizedNavigate()`
 
@@ -190,58 +236,123 @@ export function About() {
 }
 ```
 
+Returns `(to: string) => void`, which navigates to `localizePath(to)`.
+
 ### Path utilities
 
 ```ts
-i18n.stripLocalePrefix("/vi/about");  // "/about"
-i18n.localizePath("/about");          // "/{-$locale}/about"
+i18n.stripLocalePrefix("/fr/about"); // "/about"
+i18n.stripLocalePrefix("/fr");       // "/"
+i18n.localizePath("/about");         // "/{-$locale}/about"
+i18n.localizePath("/");              // "/{-$locale}"
 ```
+
+## Locale resolution
+
+**Localized routes** (anything not in `ignoredPaths`):
+
+1. Locale prefix in the URL: `/fr/about` → `fr`
+2. No prefix → `defaultLocale`
+
+The URL decides. The cookie just follows it: when the cookie doesn't match the URL locale, the server sends a new one. The default locale is never prefixed, so `/en/about` redirects to `/about`.
+
+**Ignored paths** (`ignoredPaths`, e.g. `/api/*`):
+
+1. Locale cookie
+2. `defaultLocale`
 
 ## API reference
 
-### `createLinguiStart(config): CreateLinguiStartResult<TConfig>`
+### `createLinguiStart(config)`
 
 | Config field | Type | Default | Description |
 |---|---|---|---|
-| `locales` | `readonly LocaleDefinition[]` | required | Array of `{ code, name, nativeName, regionCode? }` |
-| `defaultLocale` | `string` | required | Locale code used when none detected |
-| `cookieName` | `string` | `"locale"` | Cookie name for locale persistence |
+| `locales` | `readonly LocaleDefinition[]` | required | `{ code, name, nativeName, regionCode? }[]` |
+| `defaultLocale` | locale code | required | Used when the URL has no locale prefix. Never prefixed. |
+| `loadMessages` | `(locale: string) => Promise<Record<string, string>>` | required | Loads a locale's Lingui catalog |
+| `cookieName` | `string` | `"locale"` | Cookie that stores the locale |
 | `cookieMaxAge` | `number` | `31536000` | Cookie max-age in seconds (1 year) |
-| `ignoredPaths` | `string[]` | `[]` | Path prefixes to skip i18n for (e.g. `["api", "rpc"]`) |
-| `loadMessages` | `(locale: string) => Promise<Record<string, string>>` | required | Dynamic import of Lingui message catalogs |
+| `ignoredPaths` | `string[]` | none | First path segments that are never localized, e.g. `["api", "rpc"]`. They are joined into a regex, so escape special characters. |
+| `invalidateOnSwitch` | `boolean` | `true` | Run `router.invalidate()` after `switchLocale`. Set it to `false` when no loader returns locale-dependent data. |
 
-### Return value
+### Returned instance
 
-| Method | Use |
-|---|---|
-| `config` | The config object passed in |
-| `isValidLocale(locale)` | Type guard — checks if string is a valid locale code |
-| `shouldIgnorePath(pathname)` | Returns `true` for paths matching `ignoredPaths` |
-| `extractLocaleFromPath(pathname)` | Extracts locale code from URL path prefix |
-| `parseLocaleCookie(cookieHeader)` | Reads locale from `Cookie` header string |
-| `createCookieHeader(value)` | Builds `Set-Cookie` header value |
-| `getLocaleFromRequest(request)` | Extracts locale from `Request`, returns `{ locale, headers? }` |
-| `i18nServerEntry(request)` | Server entry handler — returns `{ redirect?, setCookie? }` |
-| `i18nMiddleware` | TanStack Start request middleware |
-| `routerWithI18n(router, i18n, opts?)` | Wraps router with I18nProvider + SSR hydration |
-| `stripLocalePrefix(pathname)` | Removes locale prefix from path |
-| `localizePath(to)` | Adds `{-$locale}` splat to path |
-| `LocalizedLink` | Link component that auto-prefixes locale |
-| `useLocale()` | Hook returning `{ currentLocale, switchLocale }` |
-| `useLocalizedNavigate()` | Hook returning navigate function that prefixes locale |
+| Member | Where | Description |
+|---|---|---|
+| `config` | both | The config you passed in |
+| `isValidLocale(locale)` | both | Type guard for configured locale codes |
+| `shouldIgnorePath(pathname)` | both | `true` if the path matches `ignoredPaths` |
+| `extractLocaleFromPath(pathname)` | both | Locale from the `/xx/...` prefix, or `null` |
+| `parseLocaleCookie(cookieHeader)` | both | Valid locale from a `Cookie` header, or `null` |
+| `createCookieHeader(locale)` | both | `"<name>=<locale>; Path=/; Max-Age=<n>; SameSite=Lax"` |
+| `stripLocalePrefix(pathname)` | both | Removes the locale prefix |
+| `localizePath(to)` | both | `/about` → `/{-$locale}/about` |
+| `getLocaleFromRequest(request)` | server | `{ locale, headers? }`; `headers` holds a `Set-Cookie` entry when the cookie needs updating |
+| `i18nServerEntry(request)` | server | `{ redirect?, setCookie? }` for `createServerEntry` |
+| `i18nMiddleware` | server | TanStack Start request middleware. Adds `{ locale, i18n }` to the context. |
+| `setupI18n()` | both | The `I18n` from the global Start context if there is one, otherwise a new instance |
+| `routerWithI18n(router, i18n, opts?)` | both | Adds `I18nProvider` and SSR dehydrate/hydrate to the router |
+| `preloadLocale(locale)` | client | Loads a locale's messages ahead of time |
+| `LocalizedLink` | client | Locale-aware TanStack `Link` |
+| `useLocale()` | client | `{ currentLocale, switchLocale, preloadLocale }` |
+| `useLocalizedNavigate()` | client | Locale-aware `(to: string) => void` |
+
+### `createMessageCache(loadMessages)`
+
+The per-locale message cache that `switchLocale` and `preloadLocale` use internally. It's exported in case you want the same behaviour somewhere else:
+
+```ts
+import { createMessageCache } from "@jimmyphong/lingui-start";
+
+const cache = createMessageCache((locale) => import(`./locales/${locale}.po`).then((m) => m.messages));
+
+cache.preload("fr");           // start loading, never rejects
+await cache.load("fr");        // shares the same request
+cache.seed("en", messages);    // record messages you already have
+cache.has("fr");               // true while loaded or loading
+```
+
+A load that fails is dropped from the cache, so the next `load` tries again.
+
+## Types
+
+```ts
+import type {
+  CreateLinguiStartResult,
+  DehydratedI18n,
+  LinguiStartConfig,
+  LocaleCode,
+  LocaleDefinition,
+  LocaleFromRequestResult,
+  LocaleMiddlewareResult,
+  LocalizedDestination,
+  LocalizedFullPaths,
+  LocalizedLinkProps,
+  LocalizedTo,
+  MessageCache,
+  SetCookieResult,
+  StripLocalePrefix,
+  SwitchLocaleOptions,
+} from "@jimmyphong/lingui-start";
+```
+
+- `LocaleCode<TConfig>`: union of the locale codes in `config.locales`
+- `LocalizedTo`: every route path under `/{-$locale}`, without the prefix (what `LocalizedLink` accepts)
 
 ## Lingui setup
 
-This package only handles integration with TanStack Start. You still need Lingui's own tooling for message extraction and compilation:
+This package only connects Lingui to TanStack Start. Extracting, compiling and writing messages is still done with Lingui's own tools:
 
 ```bash
-bun add -D @lingui/cli @lingui/conf
+npm install -D @lingui/cli @lingui/conf @lingui/vite-plugin
 ```
 
-```js
-// lingui.config.js
-export default {
-  locales: ["en", "vi"],
+```ts
+// lingui.config.ts
+import { defineConfig } from "@lingui/conf";
+
+export default defineConfig({
+  locales: ["en", "es", "fr", "de"],
   sourceLocale: "en",
   catalogs: [
     {
@@ -249,77 +360,11 @@ export default {
       include: ["src"],
     },
   ],
-  format: "po",
-};
+});
 ```
 
-See [Lingui docs](https://lingui.dev) for extraction, compilation, and message authoring.
+Add `lingui()` from `@lingui/vite-plugin` to your Vite config, together with the Lingui macro plugin for Babel or SWC. The [Lingui docs](https://lingui.dev) cover extraction, compilation and macros.
 
+## License
 
-## Locale behavior
-
-Priority:
-
-1. URL path prefix: `/vi/about`
-2. Cookie: `locale=vi`
-3. Default locale: `en`
-
-Default locale has no prefix: `/about`, not `/en/about`.
-
-## API
-
-### `createServerLingui(config)`
-
-Server entrypoint: `@sourceking/tanstack-lingui`.
-
-Returns shared locale utilities plus:
-
-| Member | Use |
-| --- | --- |
-| `i18nMiddleware` | TanStack Start request middleware. Loads Lingui messages and injects `{ locale, i18n }` context |
-| `handleI18nMiddleware(request)` | Server-entry helper for canonical redirects and locale cookie updates |
-| `routerWithI18n(router, i18n, opts?)` | Wraps TanStack Router with `I18nProvider` and dehydrate/hydrate support |
-
-### `createClientLingui(config)`
-
-Client entrypoint: `@sourceking/tanstack-lingui/client`.
-
-Returns shared locale utilities plus:
-
-| Member | Use |
-| --- | --- |
-| `LocalizedLink` | TanStack Router `Link` with `/{-$locale}` prefix |
-| `useLocale()` | Returns `{ currentLocale, switchLocale }` |
-| `useLocalizedNavigate()` | Returns locale-aware navigate function |
-
-### Shared utilities
-
-Available on both factories:
-
-| Member | Use |
-| --- | --- |
-| `config` | Original config |
-| `isValidLocale(locale)` | Locale type guard |
-| `shouldIgnorePath(pathname)` | Checks `ignoredPaths` |
-| `extractLocaleFromPath(pathname)` | Reads locale from `/:locale/*` |
-| `parseLocaleCookie(cookieHeader)` | Reads valid locale from cookie header |
-| `createCookieHeader(value)` | Builds `Set-Cookie` header |
-| `getLocaleFromRequest(request)` | Resolves locale and optional `Set-Cookie` header |
-| `stripLocalePrefix(pathname)` | Removes locale prefix |
-| `localizePath(to)` | Converts `/about` to `/{-$locale}/about` |
-
-## Types
-
-```ts
-import type {
-	ClientLinguiResult,
-	LinguiStartConfig,
-	LocaleCode,
-	LocaleDefinition,
-	LocaleMiddlewareResult,
-	LocaleUtilsResult,
-	ServerLinguiResult,
-} from "@sourceking/tanstack-lingui";
-```
-
-`LocaleCode<TConfig>` infers locale union from `config.locales`.
+MIT

@@ -1,6 +1,26 @@
 {
-	"name": "@sourceking/tanstack-lingui",
+	"name": "@jimmyphong/lingui-start",
 	"version": "0.1.2",
+	"description": "TanStack Start + Lingui i18n integration: SSR middleware, router hydration, locale-aware links and hooks.",
+	"keywords": [
+		"tanstack",
+		"tanstack-start",
+		"tanstack-router",
+		"lingui",
+		"i18n",
+		"react",
+		"ssr"
+	],
+	"author": "Jimmy Phong",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/jimmyphong/lingui-start.git"
+	},
+	"homepage": "https://github.com/jimmyphong/lingui-start#readme",
+	"bugs": {
+		"url": "https://github.com/jimmyphong/lingui-start/issues"
+	},
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -18,16 +38,17 @@
 		"build": "bun run clean && NODE_ENV=production bun run build.ts",
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist",
+		"prepublishOnly": "bun run typecheck && bun run build",
 		"npm:publish": "npm publish --access public",
 		"npm:dry-run": "npm publish --access public --dry-run"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
 		"@types/react": "^19.2.18",
-		"@types/react-dom": "^19.2.4"
+		"@types/react-dom": "^19.2.4",
+		"typescript": "^5.9.3"
 	},
 	"peerDependencies": {
-		"typescript": "^5.9.3",
 		"react": "^19.2.8",
 		"react-dom": "^19.2.8",
 		"@lingui/core": "^6.5.0",
